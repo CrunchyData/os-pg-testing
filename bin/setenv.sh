@@ -18,3 +18,5 @@ export PGDATA=/pgdata
 export PG_LOG=/tmp/pg.log
 export PATH=/opt/cpm/bin:$PGROOT/bin:$PATH
 export LD_LIBRARY_PATH=$PGROOT/lib
+
+chown postgres /pgdata
