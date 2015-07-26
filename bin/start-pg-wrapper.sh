@@ -38,14 +38,14 @@ pg_basebackup -x --no-password --pgdata $PGDATA --host=$PG_MASTER_HOST --port=54
 cp /opt/cpm/conf/pgrepl-recovery.conf /tmp
 sed -i "s/PG_MASTER_USER/$PG_MASTER_USER/g" /tmp/pgrepl-recovery.conf
 sed -i "s/PG_MASTER_HOST/$PG_MASTER_HOST/g" /tmp/pgrepl-recovery.conf
-cp /opt/cpm/conf/pgrepl-recovery.conf $PGDATA/recovery.conf
+cp /tmp/pgrepl-recovery.conf $PGDATA/recovery.conf
 }
 
 #
 # the initial start of postgres will create the database
 #
 function initialize_master() {
-if [ ! -f /pgdata/$(hostname)/postgresql.conf ]; then
+if [ ! -f /pgdata/postgresql.conf ]; then
         echo "pgdata is empty and id is..."
 	id
 	mkdir -p $PGDATA
@@ -59,7 +59,7 @@ if [ ! -f /pgdata/$(hostname)/postgresql.conf ]; then
 
         echo "starting db" >> /tmp/start-db.log
 
-	pg_ctl -D /pgdata/$(hostname) start
+	pg_ctl -D /pgdata start
         sleep 3
 
         echo "loading setup.sql" >> /tmp/start-db.log
@@ -105,28 +105,26 @@ rm /pgdata/postmaster.pid
 #
 # the normal startup of pg
 #
-export USER_ID=$(id -u)
-cp /opt/cpm/conf/passwd /tmp
-sed -i "s/USERID/$USER_ID/g" /tmp/passwd
-export LD_PRELOAD=libnss_wrapper.so NSS_WRAPPER_PASSWD=/tmp/passwd  NSS_WRAPPER_GROUP=/etc/group
+#export USER_ID=$(id -u)
+#cp /opt/cpm/conf/passwd /tmp
+#sed -i "s/USERID/$USER_ID/g" /tmp/passwd
+#export LD_PRELOAD=libnss_wrapper.so NSS_WRAPPER_PASSWD=/tmp/passwd  NSS_WRAPPER_GROUP=/etc/group
 echo "user id is..."
 id
 
-if [ -n "$PG_REPLICA" ]; then
-	echo "working on replica..."
+case "$PG_MODE" in 
+	"slave")
+	echo "working on slave"
 	initialize_replica
-	pg_ctl -D $PGDATA start 
-	exit
-fi
-
-if [ -n "$PG_MASTER_USER" ]; then
+	;;
+	"master")
 	echo "working on master..."
 	initialize_master
-	pg_ctl -D $PGDATA start 
-	exit
-fi
-
-echo "working on standalone"
-initialize_standalone
+	;;
+	"standalone")
+	echo "working on standalone"
+	initialize_standalone
+	;;
+esac
 pg_ctl -D $PGDATA start 
 
