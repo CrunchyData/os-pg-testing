@@ -1,4 +1,12 @@
-some pg testing on openshift
+# crunchy-pg 
+crunchy-pg is a container image that allows you to run
+Postgresql 9.4.4 within Openshift (v.1.0.3).
+
+There are 3 possible scenarios that are included in this
+repository:
+- standalone 
+- master-slave (one master and one slave)
+- master-slave using replication controllers
 
 
 ## Openshift Configuration
@@ -16,6 +24,7 @@ restricted   false     [CHOWN FOWNER]   false     MustRunAs   RunAsAny
 This can be set by entering the following commands, using 192.168.0.7 as
 your host IP:
 
+~~~~~~~~~~~~~~~~~
 oc config use-context default/192-168-0-107:8443/system:admin
 oc edit scc restricted --config=/var/lib/openshift/openshift.local.config/master/admin.kubeconfig
 #
@@ -40,7 +49,38 @@ runAsUser:
   type: RunAsAny
 seLinuxContext:
   type: MustRunAs
+~~~~~~~~~~~~~~~~~~~~~~~
 
+Within each Openshift JSON template, you will see that we
+add Capabilities (FOWNER, CHOWN) to the SecurityContext.
+
+Also, within the crunchy-pg Dockerfile, we use the setcap
+command to elevate the privileges of the container.  
+
+In this configuration, the containers run as the postgres USER but
+require the setcap priviledges to chown the EmptyDir provisioned volumes
+where Postgresql can write into them.
+
+## Finding the Postgresql Passwords
+
+The passwords used for the Postgresql user accounts are generated
+by the Openshift 'process' command.  To inspect what value was
+supplied, you can inspect the master pod as follows:
+
+~~~~~~~~~~~~~~~
+oc get pod pg-master-rc-1-n5z8r -o json
+~~~~~~~~~~~~~~~
+
+Look for the values of the environment variables:
+- PG_USER
+- PG_PASSWORD
+- PG_DATABASE
+
+## DNS Names
+
+This example used an Openshift project name of 'pgproject'.  The
+project name is used as part of the DNS names set by Openshift
+for Services.  
 
 ## standalone.json
 
@@ -56,7 +96,7 @@ Then in the running standalone pod, you can run the following
 command to test the database:
 
 ~~~~~~~~~~~~~~
-psql -h pg-standalone.pgproject.svc.cluster.local -U postgres postgres
+psql -h pg-standalone.pgproject.svc.cluster.local -U testuser userdb
 ~~~~~~~~~~~~~~
 
 
@@ -75,8 +115,8 @@ Then in the running standalone pod, you can run the following
 command to test the database:
 
 ~~~~~~~~~~~~~~
-psql -h pg-master.pgproject.svc.cluster.local -U postgres postgres
-psql -h pg-slave.pgproject.svc.cluster.local -U postgres postgres
+psql -h pg-master.pgproject.svc.cluster.local -U testuser userdb
+psql -h pg-slave.pgproject.svc.cluster.local -U testuser userdb
 ~~~~~~~~~~~~~~
 
 ## master-slave-rc.json
@@ -94,8 +134,8 @@ oc create -f master-slave-rc.json | oc create -f -
 Connect to the postgresql instances with the following:
 
 ~~~~~~~~~~~~~~
-psql -h pg-master-rc.pgproject.svc.cluster.local -U user postgres
-psql -h pg-slave-rc.pgproject.svc.cluster.local -U user postgres
+psql -h pg-master-rc.pgproject.svc.cluster.local -U testuser userdb
+psql -h pg-slave-rc.pgproject.svc.cluster.local -U testuser userdb
 ~~~~~~~~~~~~~~
 
 ## Scaling up Slaves
